@@ -3,7 +3,6 @@ import os
 
 from twisted.python.threadable import registerAsIOThread
 
-
 from Tribler.community.market.ttl import Ttl
 from Tribler.community.market.socket_address import SocketAddress
 from Tribler.community.market.core.price import Price
@@ -24,6 +23,7 @@ from Tribler.dispersy.member import DummyMember
 from Tribler.dispersy.message import DelayMessageByProof
 from Tribler.dispersy.requestcache import RequestCache
 
+
 class CommunityTestSuite(unittest.TestCase):
     """Community test cases."""
 
@@ -32,8 +32,10 @@ class CommunityTestSuite(unittest.TestCase):
         registerAsIOThread()
 
         # Object creation
-        self.dispersy = Dispersy(ManualEnpoint(0), unicode("dispersy_temporary"))
+        endpoint = ManualEnpoint(0)
+        self.dispersy = Dispersy(endpoint, unicode("dispersy_temporary"))
         self.dispersy._database.open()
+        endpoint.open(self.dispersy)
 
         # Faking wan address vote
         self.dispersy.wan_address_vote(('1.1.1.1', 1), Candidate(('1.1.1.1', 1), False))
@@ -90,9 +92,10 @@ class CommunityTestSuite(unittest.TestCase):
         # Test for on ask
         meta = self.market_community.get_meta_message(u"ask")
         message = meta.impl(
-            authentication = (self.market_community.my_member,),
-            distribution = (self.market_community.claim_global_time(),),
-            payload = self.ask.to_network()[1] + (Ttl.default(), SocketAddress(self.dispersy.wan_address[0], self.dispersy.wan_address[1]))
+            authentication=(self.market_community.my_member,),
+            distribution=(self.market_community.claim_global_time(),),
+            payload=self.ask.to_network()[1] + (
+            Ttl.default(), SocketAddress(self.dispersy.wan_address[0], self.dispersy.wan_address[1]))
         )
         self.market_community.on_ask([message])
         self.assertEquals(1, len(self.market_community.order_book._asks))
@@ -108,9 +111,10 @@ class CommunityTestSuite(unittest.TestCase):
         # Test for on bid
         meta = self.market_community.get_meta_message(u"bid")
         message = meta.impl(
-            authentication = (self.market_community.my_member,),
-            distribution = (self.market_community.claim_global_time(),),
-            payload = self.bid.to_network()[1] + (Ttl.default(), SocketAddress(self.dispersy.wan_address[0], self.dispersy.wan_address[1]))
+            authentication=(self.market_community.my_member,),
+            distribution=(self.market_community.claim_global_time(),),
+            payload=self.bid.to_network()[1] + (
+            Ttl.default(), SocketAddress(self.dispersy.wan_address[0], self.dispersy.wan_address[1]))
         )
         self.market_community.on_bid([message])
         self.assertEquals(0, len(self.market_community.order_book._asks))
@@ -131,7 +135,7 @@ class CommunityTestSuite(unittest.TestCase):
         message = meta.impl(
             authentication=(self.market_community.my_member,),
             distribution=(self.market_community.claim_global_time(),),
-            destination=candidate,
+            destination=(candidate,),
             payload=payload
         )
         self.market_community.on_proposed_trade([message])
@@ -160,7 +164,7 @@ class CommunityTestSuite(unittest.TestCase):
         message = meta.impl(
             authentication=(self.market_community.my_member,),
             distribution=(self.market_community.claim_global_time(),),
-            destination=candidate,
+            destination=(candidate,),
             payload=payload
         )
         self.market_community.on_declined_trade([message])
@@ -175,7 +179,7 @@ class CommunityTestSuite(unittest.TestCase):
         message = meta.impl(
             authentication=(self.market_community.my_member,),
             distribution=(self.market_community.claim_global_time(),),
-            destination=candidate,
+            destination=(candidate,),
             payload=payload
         )
         self.market_community.on_counter_trade([message])
@@ -205,6 +209,7 @@ class CommunityTestSuite(unittest.TestCase):
     def tearDown(self):
         # Closing and unlocking dispersy database for other tests in test suite
         self.dispersy._database.close()
+
 
 if __name__ == '__main__':
     unittest.main()
