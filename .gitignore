@@ -41,3 +41,4 @@ cover/
 htmlcov/
 .coverage
 *.db
+*.db-journal
