@@ -40,3 +40,4 @@ test_file.torrent
 cover/
 htmlcov/
 .coverage
+*.db
