@@ -1,5 +1,4 @@
 import random
-import time
 
 from twisted.python.threadable import registerAsIOThread
 
@@ -163,7 +162,7 @@ class TradeSimulationNode(object):
                                                                             market_community.on_counter_trade)
         market_community.on_start_transaction = self._message_counter_decorator("on start transaction count",
                                                                                 market_community.on_start_transaction)
-        market_community.on_end_transaction = self._message_counter_decorator("on end transacion count",
+        market_community.on_end_transaction = self._message_counter_decorator("on end transaction count",
                                                                               market_community.on_end_transaction)
         market_community.on_bitcoin_payment = self._message_counter_decorator("on bitcoin payment count",
                                                                               market_community.on_bitcoin_payment)
