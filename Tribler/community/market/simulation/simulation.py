@@ -143,6 +143,7 @@ class TradeSimulationNode(object):
         self._neighbours = {}
         self._decorate_message_counters(self._market_community)
         self._mock_dispersy_send_message(self._market_community)
+        self._mock_payment_providers(self._market_community)
 
     @property
     def location(self):
@@ -268,6 +269,15 @@ class TradeSimulationNode(object):
 
         market_community.dispersy.store_update_forward = send_message
 
+    def _mock_payment_providers(self, market_community):
+        """
+        Mocks the payment providers in the market community
+        :param market_community: The market community to mock the payment providers from
+        """
+
+        market_community.multi_chain_payment_provider = SimulationMultiChainPaymentProvider()
+        market_community.bitcoin_payment_provider = SimulationBitcoinPaymentProvider()
+
     def simulate_ask(self, price, quantity, timeout):
         """
         Create an ask order (sell order)
@@ -298,6 +308,24 @@ class TradeSimulationNode(object):
         """
         self._dispersy._database.close()
         self._endpoint.close()
+
+
+class SimulationMultiChainPaymentProvider(object):
+
+    def transfer_multi_chain(self, candidate, quantity):
+        return
+
+    def balance(self):
+        return
+
+
+class SimulationBitcoinPaymentProvider(object):
+
+    def transfer_bitcoin(self, bitcoin_address, price):
+        return
+
+    def balance(self):
+        return
 
 
 # Execute the trade simulation
