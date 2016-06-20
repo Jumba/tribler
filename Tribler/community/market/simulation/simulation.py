@@ -1,5 +1,8 @@
 import random
 from random import randint
+from Tkinter import Tk, Canvas, Frame, BOTH
+import math
+import time
 
 from twisted.python.threadable import registerAsIOThread
 
@@ -23,9 +26,13 @@ class TradeSimulation(object):
         """
         Starts the specified amount of simulation nodes and insert the specified amount of ticks randomly across the nodes.
         """
+
+        self._visualization = SimulationVisualization()
+
         self._nodes = []
         self._create_nodes(self.NODE_AMOUNT)
         self._connect_nodes()
+
         self._simulate_ticks(self.TICK_AMOUNT)
         self._tear_down()
 
@@ -115,6 +122,8 @@ class TradeSimulationNode(object):
         """
         Starts a market community node like in the market community test
         """
+        self.name = "node-" + str(number)
+
         # Faking IOThread
         registerAsIOThread()
 
@@ -192,7 +201,7 @@ class TradeSimulationNode(object):
         market_community.on_counter_trade = self._message_counter_decorator("received counter trade count",
                                                                             market_community.on_counter_trade)
         market_community.on_accepted_trade = self._message_counter_decorator("received accepted trade count",
-                                                                            market_community.on_accepted_trade)
+                                                                             market_community.on_accepted_trade)
         market_community.on_start_transaction = self._message_counter_decorator("received start transaction count",
                                                                                 market_community.on_start_transaction)
         market_community.on_end_transaction = self._message_counter_decorator("received end transaction count",
@@ -314,7 +323,6 @@ class TradeSimulationNode(object):
 
 
 class SimulationMultiChainPaymentProvider(object):
-
     def transfer_multi_chain(self, candidate, quantity):
         return
 
@@ -323,12 +331,67 @@ class SimulationMultiChainPaymentProvider(object):
 
 
 class SimulationBitcoinPaymentProvider(object):
-
     def transfer_bitcoin(self, bitcoin_address, price):
         return
 
     def balance(self):
         return
+
+
+class SimulationVisualization(object):
+    def __init__(self):
+        self.root = Tk()
+        self.canvas = Canvas(self.root, width=800, height=800, bg='#e9e9e9')
+        self.canvas.pack()
+
+        self._nodes = [0, 1, 2, 3, 4, 5]
+
+        self.animation()
+
+        self.canvas.pack()
+        self.root.after(2, self.animation)
+        self.root.mainloop()
+
+    def animation(self):
+        time.sleep(0.025)
+        self.canvas.delete("all")
+        drawed_nodes = self._draw_nodes(self._nodes)
+        self._draw_connection(drawed_nodes)
+        self.canvas.update()
+        self.root.after(2, self.animation)
+
+    def draw(self, nodes):
+        drawed_nodes = self._draw_nodes(self._nodes)
+        self._draw_connection(drawed_nodes)
+        self.canvas.pack(fill=BOTH, expand=1)
+
+    MID_X = 400
+    MID_Y = 400
+    MID_RADIUS = 300
+    NODE_RADIUS = 50
+    LINE_WIDTH = 3
+    LINE_COLOR = '#404040'
+
+    def _draw_nodes(self, nodes):
+        drawed_nodes = {}
+        for (i, node) in enumerate(nodes):
+            x = self.MID_X + math.sin((2 * i * math.pi) / len(nodes)) * self.MID_RADIUS
+            y = self.MID_Y + math.cos((2 * i * math.pi) / len(nodes)) * self.MID_RADIUS
+            r = self.NODE_RADIUS
+            self.canvas.create_oval(x - r, y - r, x + r, y + r, outline=self.LINE_COLOR, fill='#9dbffd',
+                                    width=self.LINE_WIDTH)
+            self.canvas.create_text(x, y, fill=self.LINE_COLOR, font=("Cambria", 18), text=str(randint(0,9)))
+            drawed_nodes[node] = (x, y)
+        return drawed_nodes
+
+    def _draw_connection(self, drawed_nodes):
+        for origin in drawed_nodes:
+            for destination in drawed_nodes:
+                if not destination == origin:
+                    line = self.canvas.create_line(drawed_nodes[origin][0], drawed_nodes[origin][1],
+                                                   drawed_nodes[destination][0], drawed_nodes[destination][1],
+                                                   fill=self.LINE_COLOR, width=self.LINE_WIDTH)
+                    self.canvas.tag_lower(line)
 
 
 # Execute the trade simulation
