@@ -72,8 +72,8 @@ class TradeSimulation(object):
         Simulates a bid with semi-random parameters
         :param node: The market community node to simulate the bid on
         """
-        price = 1.0
-        quantity = 1.0
+        price = randint(3, 10)
+        quantity = randint(3, 10)
         timeout = float("inf")
         node.simulate_bid(price, quantity, timeout)
 
@@ -82,8 +82,8 @@ class TradeSimulation(object):
         Simulates an ask with semi-random parameters
         :param node: The market community node to simulate the ask on
         """
-        price = 1.0
-        quantity = 1.0
+        price = randint(3, 10)
+        quantity = randint(3, 10)
         timeout = float("inf")
         node.simulate_ask(price, quantity, timeout)
 
