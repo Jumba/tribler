@@ -1,4 +1,5 @@
 import random
+from random import randint
 
 from twisted.python.threadable import registerAsIOThread
 
@@ -15,8 +16,8 @@ from Tribler.dispersy.requestcache import RequestCache
 class TradeSimulation(object):
     """Simulation class for tick and trade functionality experiment."""
 
-    NODE_AMOUNT = 10
-    TICK_AMOUNT = 1000
+    NODE_AMOUNT = 2
+    TICK_AMOUNT = 10
 
     def __init__(self):
         """
@@ -100,8 +101,8 @@ class TradeSimulation(object):
             statistics["total"]["ask count"] += len(node._asks)
             statistics["total"]["bid count"] += len(node._bids)
             statistics["node-" + str(i + 1)] = {}
-            statistics["node-" + str(i + 1)][" ask count"] = len(node._asks)
-            statistics["node-" + str(i + 1)][" bid count"] = len(node._bids)
+            statistics["node-" + str(i + 1)]["ask count"] = len(node._asks)
+            statistics["node-" + str(i + 1)]["bid count"] = len(node._bids)
             statistics["node-" + str(i + 1)] = node.message_counters
 
         return statistics
@@ -180,23 +181,25 @@ class TradeSimulationNode(object):
         Decorates all on message functions with a message counter
         :param market_community: The market community to decorate
         """
-        market_community.on_ask = self._message_counter_decorator("on ask count", market_community.on_ask)
-        market_community.on_bid = self._message_counter_decorator("on bid count", market_community.on_bid)
-        market_community.on_proposed_trade = self._message_counter_decorator("on proposed trade count",
+        market_community.on_ask = self._message_counter_decorator("received ask count", market_community.on_ask)
+        market_community.on_bid = self._message_counter_decorator("received bid count", market_community.on_bid)
+        market_community.on_proposed_trade = self._message_counter_decorator("received proposed trade count",
                                                                              market_community.on_proposed_trade)
-        market_community.on_declined_trade = self._message_counter_decorator("on declined trade count",
+        market_community.on_declined_trade = self._message_counter_decorator("received declined trade count",
                                                                              market_community.on_declined_trade)
-        market_community.on_proposed_trade = self._message_counter_decorator("on proposed trade count",
+        market_community.on_proposed_trade = self._message_counter_decorator("received proposed trade count",
                                                                              market_community.on_proposed_trade)
-        market_community.on_counter_trade = self._message_counter_decorator("on counter trade count",
+        market_community.on_counter_trade = self._message_counter_decorator("received counter trade count",
                                                                             market_community.on_counter_trade)
-        market_community.on_start_transaction = self._message_counter_decorator("on start transaction count",
+        market_community.on_accepted_trade = self._message_counter_decorator("received accepted trade count",
+                                                                            market_community.on_accepted_trade)
+        market_community.on_start_transaction = self._message_counter_decorator("received start transaction count",
                                                                                 market_community.on_start_transaction)
-        market_community.on_end_transaction = self._message_counter_decorator("on end transaction count",
+        market_community.on_end_transaction = self._message_counter_decorator("received end transaction count",
                                                                               market_community.on_end_transaction)
-        market_community.on_bitcoin_payment = self._message_counter_decorator("on bitcoin payment count",
+        market_community.on_bitcoin_payment = self._message_counter_decorator("received bitcoin payment count",
                                                                               market_community.on_bitcoin_payment)
-        market_community.on_multi_chain_payment = self._message_counter_decorator("on multi chain payment count",
+        market_community.on_multi_chain_payment = self._message_counter_decorator("received multi chain payment count",
                                                                                   market_community.on_multi_chain_payment)
 
     def add_neighbour(self, neighbour, location):
@@ -334,10 +337,9 @@ statistics = trade_simulation.statistics()
 
 # Print the statistics dictionary
 for key in statistics:
-    print key
     if isinstance(statistics[key], dict):
+        print key
         for nested_key in statistics[key]:
-            print "\t" + nested_key
-            print "\t\t" + str(statistics[key][nested_key])
+            print "\t" + nested_key + ": " + str(statistics[key][nested_key])
     else:
-        print "\t" + statistics[key]
+        print key + ": " + statistics[key]
