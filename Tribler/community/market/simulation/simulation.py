@@ -1,6 +1,6 @@
 import random
-from random import randint
-from Tkinter import Tk, Canvas, Frame, BOTH
+from random import shuffle, randint
+from Tkinter import Tk, Canvas, Frame, BOTH, CENTER, N, S
 import math
 import time
 
@@ -19,7 +19,7 @@ from Tribler.dispersy.requestcache import RequestCache
 class TradeSimulation(object):
     """Simulation class for tick and trade functionality experiment."""
 
-    NODE_AMOUNT = 6
+    NODE_AMOUNT = 8
     TICK_AMOUNT = 10
 
     def __init__(self):
@@ -32,12 +32,25 @@ class TradeSimulation(object):
         self._connect_nodes()
 
     def flush_buffers(self):
-        for node in self._nodes:
-            node.flush_buffer()
+        messages = []
 
-    def print_buffers(self):
+        messages = self.messages()
+        self.clear_buffers()
+
+        random_buffer = []
+
+        for (node, buffer) in messages:
+            for (neighbour, neighbour_messages) in buffer:
+                for message in neighbour_messages:
+                    random_buffer.append((neighbour, message))
+        shuffle(random_buffer)
+        for (neighbour, message) in random_buffer:
+            neighbour.receive_message(message)
+
+    def clear_buffers(self):
+        messages = []
         for node in self._nodes:
-            node.print_buffer()
+            node._buffer = {}
 
     def _tear_down(self):
         """
@@ -73,7 +86,7 @@ class TradeSimulation(object):
         :param amount: The amount of ticks to simulate
         """
         for i in xrange(0, self.TICK_AMOUNT):
-            if random.random() > 0.5:
+            if i > (self.TICK_AMOUNT / 2 - 1):
                 self._simulate_bid(random.choice(self._nodes))
             else:
                 self._simulate_ask(random.choice(self._nodes))
@@ -83,8 +96,8 @@ class TradeSimulation(object):
         Simulates a bid with semi-random parameters
         :param node: The market community node to simulate the bid on
         """
-        price = randint(3, 10)
-        quantity = randint(3, 10)
+        price = 1
+        quantity = 1
         timeout = float("inf")
         node.simulate_bid(price, quantity, timeout)
 
@@ -93,8 +106,8 @@ class TradeSimulation(object):
         Simulates an ask with semi-random parameters
         :param node: The market community node to simulate the ask on
         """
-        price = randint(3, 10)
-        quantity = randint(3, 10)
+        price = 1
+        quantity = 1
         timeout = float("inf")
         node.simulate_ask(price, quantity, timeout)
 
@@ -120,10 +133,9 @@ class TradeSimulation(object):
     def messages(self):
         messages = []
         for node in self._nodes:
-            print "node size" + str(len(node._buffer))
-            for (neighbour, message) in node._buffer:
-                messages.append(message)
+            messages.append((node, node.messages()))
         return messages
+
 
 class TradeSimulationNode(object):
     """Trade simulation node containing an interface for a market community node."""
@@ -167,7 +179,7 @@ class TradeSimulationNode(object):
         self._mock_payment_providers(self._market_community)
 
         # Message buffer
-        self._buffer = []
+        self._buffer = {}
 
     @property
     def location(self):
@@ -273,18 +285,20 @@ class TradeSimulationNode(object):
             self._market_community.on_bitcoin_payment([message])
             return
 
-    def flush_buffer(self):
-        for (neighbour, message) in self._buffer:
-            neighbour.receive_message(message)
-        self._buffer = []
-
-    def print_buffer(self):
-        for (neighbour, message) in self._buffer:
-            print self.name + " -> " + neighbour.name
-
     def _send_neighbour(self, location, message):
-        self._buffer.append((self._neighbours[location], message))
-        # print self.name + " -> " + self._neighbours[location].name
+        if self._neighbours[location] in self._buffer:
+            self._buffer[self._neighbours[location]].append(message)
+        else:
+            self._buffer[self._neighbours[location]] = [message]
+
+    def messages(self):
+        neighbour_messages = []
+        for neighbour, messages in self._buffer.iteritems():
+            message_list = []
+            for message in messages:
+                message_list.append(message)
+            neighbour_messages.append((neighbour, message_list))
+        return neighbour_messages
 
     def _send_neighbours(self, message):
         for location in self._neighbours:
@@ -372,44 +386,51 @@ class SimulationVisualization(object):
         self._simulation = TradeSimulation()
         self._simulation._simulate_ticks()
 
-        self.progress = 0.05
-        self.animation()
-
+        self.progress = 0.01
+        self.messages = self._simulation.messages()
         self.canvas.pack()
-        self.root.after(2, self.animation)
+        self.root.after(0, self.animation)
         self.root.mainloop()
 
     def animation(self):
-        self.progress += 0.01
+        self.canvas.delete("all")
+        time.sleep(0.005)
+
+        self.progress += 0.015
         if (self.progress > 1):
             self.progress = 0
+            self.messages = self._simulation.messages()
             self._simulation.flush_buffers()
-            self._simulation.print_buffers()
-        self.canvas.delete("all")
-        time.sleep(0.025)
 
         self._draw_nodes(self._simulation._nodes)
+        self._draw_messages(self._simulation._nodes, self.messages)
         self._draw_connection(self._simulation._nodes)
-        self._draw_messages(self._simulation._nodes)
 
         self.canvas.update()
         self.root.after(2, self.animation)
 
     MID_X = 400
     MID_Y = 400
-    MID_RADIUS = 300
+    MID_RADIUS = 250
+    MID_TEXT_RADIUS = 350
     NODE_RADIUS = 50
     LINE_WIDTH = 3
-    LINE_COLOR = '#404040'
+    OUTLINE_COLOR = '#404040'
 
     def _draw_nodes(self, nodes):
         for (i, node) in enumerate(nodes):
-            node.x = self.MID_X + math.sin((2 * i * math.pi) / len(nodes)) * self.MID_RADIUS
-            node.y = self.MID_Y + math.cos((2 * i * math.pi) / len(nodes)) * self.MID_RADIUS
+            t = -1.5
+            node.x = self.MID_X + math.sin((2 * (-i + t) * math.pi) / len(nodes)) * self.MID_RADIUS
+            node.y = self.MID_Y + math.cos((2 * (-i + t) * math.pi) / len(nodes)) * self.MID_RADIUS
             r = self.NODE_RADIUS
-            self.canvas.create_oval(node.x - r, node.y - r, node.x + r, node.y + r, outline=self.LINE_COLOR, fill='#9dbffd',
+            self.canvas.create_oval(node.x - r, node.y - r, node.x + r, node.y + r, outline=self.OUTLINE_COLOR,
+                                    fill='#9dbffd',
                                     width=self.LINE_WIDTH)
-            self.canvas.create_text(node.x, node.y, fill=self.LINE_COLOR, font=("Cambria", 18), text=node.name)
+            x = self.MID_X + math.sin((2 * (-i + t) * math.pi) / len(nodes)) * self.MID_TEXT_RADIUS
+            y = self.MID_Y + math.cos((2 * (-i + t) * math.pi) / len(nodes)) * self.MID_TEXT_RADIUS
+            self.canvas.create_text(x, y, fill=self.OUTLINE_COLOR, font=("Cambria", 18), text=node.name)
+
+    LINE_COLOR = '#808080'
 
     def _draw_connection(self, nodes):
         for node in nodes:
@@ -419,27 +440,30 @@ class SimulationVisualization(object):
                                                fill=self.LINE_COLOR, width=self.LINE_WIDTH)
                 self.canvas.tag_lower(line)
 
-    def _draw_messages(self, nodes):
+    def _draw_messages(self, nodes, messages):
+        for (node, buffer) in messages:
+            for (neighbour, neighbour_messages) in buffer:
+                message_list = []
+                for message in neighbour_messages:
+                    message_list.append(message._meta._name)
 
-        for node in nodes:
-            for (neighbour, message) in node._buffer:
                 x = node.x + (neighbour.x - node.x) * self.progress
                 y = node.y + (neighbour.y - node.y) * self.progress
-                self._draw_message(message, x, y)
+                self._draw_message(message, x, y, "(" + ',\n'.join(message_list) + ")")
 
     MESSAGE_RADIUS = 8
 
-    def _draw_message(self, message, x, y):
+    def _draw_message(self, message, x, y, message_info):
         r = self.MESSAGE_RADIUS
-        self.canvas.create_oval(x - r, y - r, x + r, y + r, outline=self.LINE_COLOR, fill='green',
-                                width=self.LINE_WIDTH)
-        self.canvas.create_text(x, y - self.MESSAGE_RADIUS * 2, fill=self.LINE_COLOR, font=("Cambria", 12),
-                                text=message._meta._name)  # Execute the trade visualization
+        oval = self.canvas.create_oval(x - r, y - r, x + r, y + r, outline=self.OUTLINE_COLOR, fill='green',
+                                       width=self.LINE_WIDTH)
+        text = self.canvas.create_text(x, y - self.MESSAGE_RADIUS * 2, fill=self.OUTLINE_COLOR, font=("Cambria", 8),
+                                       text=message_info, justify=CENTER, anchor=S)  # Execute the trade visualization
 
 
 visualization = SimulationVisualization()
 statistics = visualization._simulation.statistics()
-visualization._simulation._tear_down()
+# visualization._simulation._tear_down()
 
 # Print the statistics dictionary
 for key in statistics:
