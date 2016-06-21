@@ -19,7 +19,7 @@ from Tribler.dispersy.requestcache import RequestCache
 class TradeSimulation(object):
     """Simulation class for tick and trade functionality experiment."""
 
-    NODE_AMOUNT = 2
+    NODE_AMOUNT = 6
     TICK_AMOUNT = 10
 
     def __init__(self):
@@ -27,14 +27,17 @@ class TradeSimulation(object):
         Starts the specified amount of simulation nodes and insert the specified amount of ticks randomly across the nodes.
         """
 
-        self._visualization = SimulationVisualization()
-
         self._nodes = []
         self._create_nodes(self.NODE_AMOUNT)
         self._connect_nodes()
 
-        self._simulate_ticks(self.TICK_AMOUNT)
-        self._tear_down()
+    def flush_buffers(self):
+        for node in self._nodes:
+            node.flush_buffer()
+
+    def print_buffers(self):
+        for node in self._nodes:
+            node.print_buffer()
 
     def _tear_down(self):
         """
@@ -62,14 +65,14 @@ class TradeSimulation(object):
         for node in self._nodes:
             for neighbour in self._nodes:
                 if not node == neighbour:
-                    node.add_neighbour(neighbour, neighbour.location, )
+                    node.add_neighbour(neighbour, neighbour.location)
 
-    def _simulate_ticks(self, amount):
+    def _simulate_ticks(self):
         """
         Simulates the specified amount of ticks, the tick type and the market community node are randomly determined
         :param amount: The amount of ticks to simulate
         """
-        for i in xrange(0, amount):
+        for i in xrange(0, self.TICK_AMOUNT):
             if random.random() > 0.5:
                 self._simulate_bid(random.choice(self._nodes))
             else:
@@ -114,6 +117,13 @@ class TradeSimulation(object):
 
         return statistics
 
+    def messages(self):
+        messages = []
+        for node in self._nodes:
+            print "node size" + str(len(node._buffer))
+            for (neighbour, message) in node._buffer:
+                messages.append(message)
+        return messages
 
 class TradeSimulationNode(object):
     """Trade simulation node containing an interface for a market community node."""
@@ -151,9 +161,13 @@ class TradeSimulationNode(object):
         self._message_counters = {}
 
         self._neighbours = {}
+        self._connected_nodes = []
         self._decorate_message_counters(self._market_community)
         self._mock_dispersy_send_message(self._market_community)
         self._mock_payment_providers(self._market_community)
+
+        # Message buffer
+        self._buffer = []
 
     @property
     def location(self):
@@ -218,6 +232,7 @@ class TradeSimulationNode(object):
         :return:
         """
         self._neighbours[location] = neighbour
+        self._connected_nodes.append(neighbour)
 
     def receive_message(self, message):
         """
@@ -258,8 +273,18 @@ class TradeSimulationNode(object):
             self._market_community.on_bitcoin_payment([message])
             return
 
+    def flush_buffer(self):
+        for (neighbour, message) in self._buffer:
+            neighbour.receive_message(message)
+        self._buffer = []
+
+    def print_buffer(self):
+        for (neighbour, message) in self._buffer:
+            print self.name + " -> " + neighbour.name
+
     def _send_neighbour(self, location, message):
-        self._neighbours[location].receive_message(message)
+        self._buffer.append((self._neighbours[location], message))
+        # print self.name + " -> " + self._neighbours[location].name
 
     def _send_neighbours(self, message):
         for location in self._neighbours:
@@ -344,8 +369,10 @@ class SimulationVisualization(object):
         self.canvas = Canvas(self.root, width=800, height=800, bg='#e9e9e9')
         self.canvas.pack()
 
-        self._nodes = [0, 1, 2, 3, 4, 5]
+        self._simulation = TradeSimulation()
+        self._simulation._simulate_ticks()
 
+        self.progress = 0.05
         self.animation()
 
         self.canvas.pack()
@@ -353,17 +380,20 @@ class SimulationVisualization(object):
         self.root.mainloop()
 
     def animation(self):
-        time.sleep(0.025)
+        self.progress += 0.01
+        if (self.progress > 1):
+            self.progress = 0
+            self._simulation.flush_buffers()
+            self._simulation.print_buffers()
         self.canvas.delete("all")
-        drawed_nodes = self._draw_nodes(self._nodes)
-        self._draw_connection(drawed_nodes)
+        time.sleep(0.025)
+
+        self._draw_nodes(self._simulation._nodes)
+        self._draw_connection(self._simulation._nodes)
+        self._draw_messages(self._simulation._nodes)
+
         self.canvas.update()
         self.root.after(2, self.animation)
-
-    def draw(self, nodes):
-        drawed_nodes = self._draw_nodes(self._nodes)
-        self._draw_connection(drawed_nodes)
-        self.canvas.pack(fill=BOTH, expand=1)
 
     MID_X = 400
     MID_Y = 400
@@ -373,30 +403,43 @@ class SimulationVisualization(object):
     LINE_COLOR = '#404040'
 
     def _draw_nodes(self, nodes):
-        drawed_nodes = {}
         for (i, node) in enumerate(nodes):
-            x = self.MID_X + math.sin((2 * i * math.pi) / len(nodes)) * self.MID_RADIUS
-            y = self.MID_Y + math.cos((2 * i * math.pi) / len(nodes)) * self.MID_RADIUS
+            node.x = self.MID_X + math.sin((2 * i * math.pi) / len(nodes)) * self.MID_RADIUS
+            node.y = self.MID_Y + math.cos((2 * i * math.pi) / len(nodes)) * self.MID_RADIUS
             r = self.NODE_RADIUS
-            self.canvas.create_oval(x - r, y - r, x + r, y + r, outline=self.LINE_COLOR, fill='#9dbffd',
+            self.canvas.create_oval(node.x - r, node.y - r, node.x + r, node.y + r, outline=self.LINE_COLOR, fill='#9dbffd',
                                     width=self.LINE_WIDTH)
-            self.canvas.create_text(x, y, fill=self.LINE_COLOR, font=("Cambria", 18), text=str(randint(0,9)))
-            drawed_nodes[node] = (x, y)
-        return drawed_nodes
+            self.canvas.create_text(node.x, node.y, fill=self.LINE_COLOR, font=("Cambria", 18), text=node.name)
 
-    def _draw_connection(self, drawed_nodes):
-        for origin in drawed_nodes:
-            for destination in drawed_nodes:
-                if not destination == origin:
-                    line = self.canvas.create_line(drawed_nodes[origin][0], drawed_nodes[origin][1],
-                                                   drawed_nodes[destination][0], drawed_nodes[destination][1],
-                                                   fill=self.LINE_COLOR, width=self.LINE_WIDTH)
-                    self.canvas.tag_lower(line)
+    def _draw_connection(self, nodes):
+        for node in nodes:
+            for neighbour in node._connected_nodes:
+                line = self.canvas.create_line(node.x, node.y,
+                                               neighbour.x, neighbour.y,
+                                               fill=self.LINE_COLOR, width=self.LINE_WIDTH)
+                self.canvas.tag_lower(line)
+
+    def _draw_messages(self, nodes):
+
+        for node in nodes:
+            for (neighbour, message) in node._buffer:
+                x = node.x + (neighbour.x - node.x) * self.progress
+                y = node.y + (neighbour.y - node.y) * self.progress
+                self._draw_message(message, x, y)
+
+    MESSAGE_RADIUS = 8
+
+    def _draw_message(self, message, x, y):
+        r = self.MESSAGE_RADIUS
+        self.canvas.create_oval(x - r, y - r, x + r, y + r, outline=self.LINE_COLOR, fill='green',
+                                width=self.LINE_WIDTH)
+        self.canvas.create_text(x, y - self.MESSAGE_RADIUS * 2, fill=self.LINE_COLOR, font=("Cambria", 12),
+                                text=message._meta._name)  # Execute the trade visualization
 
 
-# Execute the trade simulation
-trade_simulation = TradeSimulation()
-statistics = trade_simulation.statistics()
+visualization = SimulationVisualization()
+statistics = visualization._simulation.statistics()
+visualization._simulation._tear_down()
 
 # Print the statistics dictionary
 for key in statistics:
