@@ -7,7 +7,7 @@ This page contains information about setting up a Tribler development environmen
 #### Debian/Ubuntu/Mint
 ```bash
 sudo apt-get install libav-tools libjs-excanvas libjs-mootools libsodium13 libx11-6 python-apsw python-cherrypy3 python-crypto python-cryptography python-feedparser python-leveldb python-libtorrent python-m2crypto python-netifaces python-pil python-pyasn1 python-requests python-twisted python-wxgtk2.8 python2.7 vlc python-pip
-pip install decorator
+pip install decorator configobj
 ```
 
 #### **Experimental support for Ubuntu 16.04**
